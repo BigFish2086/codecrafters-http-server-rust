@@ -14,9 +14,16 @@ fn main() {
                         let content = std::str::from_utf8(&buffer[..buffer_len]).unwrap();
                         if let Err(err) = match content.split(" ").into_iter().skip(1).next() {
                             Some(path) if path == "/" => stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n"),
+                            Some(path) if path.starts_with("/echo/") => {
+                                let echo_len = "/echo/".len();
+                                let body = &path[echo_len..];
+                                let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}\r\n", body.len(), body);
+                                println!("{}", response);
+                                stream.write_all(&response.as_bytes())
+                            }
                             _ => stream.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n")
                         } {
-                            print!("Error: {}", err);
+                            print!("ERROR: {}", err);
                         }
                     }
                     Err(err) => { println!("ERROR: {}", err); }
