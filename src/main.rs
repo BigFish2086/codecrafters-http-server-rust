@@ -117,7 +117,7 @@ impl Response {
         match &self.body {
             Some(body) => {
                 let body_len = body.len();
-                text.push_str(format!("Content-Length: {}\r\n\r\n{}\r\n", body_len, body).as_str());
+                text.push_str(format!("Content-Length: {}\r\n\r\n{}", body_len, body).as_str());
             }
             None => text.push_str("\r\n")
         }
@@ -148,12 +148,7 @@ fn main() {
                         let content = std::str::from_utf8(&buffer[..buffer_len]).unwrap();
                         if let Err(err) = match content.split(" ").into_iter().skip(1).next() {
                             Some(path) if path == "/" => {
-                                let resp = Response { 
-                                    status_code: StatusCode::OK,
-                                    headers: None,
-                                    body: None,
-                                };
-                                stream.write_all(&resp.as_bytes())
+                                stream.write_all(&Response::new(StatusCode::OK, None, None).as_bytes())
                             }
                             Some(path) if path.starts_with("/echo/") => {
                                 let echo_len = "/echo/".len();
@@ -166,12 +161,7 @@ fn main() {
                                 stream.write_all(&resp.as_bytes())
                             }
                             _ => {
-                                let resp = Response { 
-                                    status_code: StatusCode::NOT_FOUND,
-                                    headers: None,
-                                    body: None,
-                                };
-                                stream.write_all(&resp.as_bytes())
+                                stream.write_all(&Response::new(StatusCode::NOT_FOUND, None, None).as_bytes())
                             }
                         } {
                             print!("ERROR: {}", err);
