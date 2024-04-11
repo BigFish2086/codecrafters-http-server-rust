@@ -42,7 +42,13 @@ fn main() {
                 let mut buffer = [0u8; 1024];
                 match stream.read(&mut buffer) {
                     Ok(buffer_len) => {
-                        let req = Request::from_utf8(&buffer[..buffer_len]).unwrap();
+                        let req = match Request::from_utf8(&buffer[..buffer_len]) {
+                            Ok(req) => req,
+                            Err(err) => {
+                                eprintln!("ERROR: {}", err);
+                                continue
+                            }
+                        };
                         if let Err(err) = match req.path {
                             path if path == "/" => stream
                                 .write_all(&Response::new(StatusCode::OK, None, None).as_bytes()),
@@ -56,16 +62,16 @@ fn main() {
                                 &Response::new(StatusCode::NOT_FOUND, None, None).as_bytes(),
                             ),
                         } {
-                            println!("ERROR: {}", err);
+                            eprintln!("ERROR: {}", err);
                         }
                     }
                     Err(err) => {
-                        println!("ERROR: {}", err);
+                        eprintln!("ERROR: {}", err);
                     }
                 };
             }
             Err(err) => {
-                println!("ERROR: {}", err);
+                eprintln!("ERROR: {}", err);
             }
         }
     }
