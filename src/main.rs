@@ -11,8 +11,13 @@ fn main() {
                 let mut buffer = [0u8; 1024];
                 match stream.read(&mut buffer) {
                     Ok(buffer_len) => {
-                        println!("INFO: Read {} bytes\n{}", buffer_len, std::str::from_utf8(&buffer[..buffer_len]).unwrap());
-                        if let Err(err) = stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n") {
+                        let content = std::str::from_utf8(&buffer[..buffer_len]).unwrap();
+                        let request_line = content.split("\r\n").next().unwrap();
+                        let path: Vec<_> = request_line.split(" ").collect();
+                        if let Err(err) = match path.get(1) {
+                            Some(path) if *path == "/" => stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n"),
+                            _ => stream.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n")
+                        } {
                             print!("Error: {}", err);
                         }
                     }
