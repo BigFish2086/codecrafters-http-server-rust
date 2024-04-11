@@ -119,7 +119,7 @@ impl Response {
                 let body_len = body.len();
                 text.push_str(format!("Content-Length: {}\r\n\r\n{}\r\n", body_len, body).as_str());
             }
-            None => {}
+            None => text.push_str("\r\n")
         }
         return text;
     }
