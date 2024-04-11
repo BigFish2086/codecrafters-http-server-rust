@@ -1,8 +1,8 @@
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::collections::HashMap;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StatusCode(u16);
@@ -136,13 +136,14 @@ impl fmt::Display for Response {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct Request {
     method: String,
     path: String,
     version: String,
     headers: Option<HashMap<String, String>>,
-    body: Option<String>
+    body: Option<String>,
 }
 
 impl Request {
@@ -165,11 +166,11 @@ impl Request {
         }
 
         Ok(Self {
-            method:  method.to_string(),
-            path:    path.to_string(),
+            method: method.to_string(),
+            path: path.to_string(),
             version: version.to_string(),
             headers: (!headers.is_empty()).then_some(headers),
-            body:    None,
+            body: None,
         })
     }
 }
@@ -179,7 +180,7 @@ fn echo_msg(req: &Request) -> Response {
     let resp_body = &req.path[echo_len..];
     Response {
         status_code: StatusCode::OK,
-        headers: Some(vec![("Content-Type".to_string(), "text/plain".to_string(),)]),
+        headers: Some(vec![("Content-Type".to_string(), "text/plain".to_string())]),
         body: Some(resp_body.to_string()),
     }
 }
@@ -188,11 +189,11 @@ fn echo_header(req: &Request, header: &str) -> Response {
     let binding = String::new();
     let resp_body = match &req.headers {
         Some(map) => map.get(header).unwrap_or(&binding),
-        None => ""
+        None => "",
     };
     Response {
         status_code: StatusCode::OK,
-        headers: Some(vec![("Content-Type".to_string(), "text/plain".to_string(),)]),
+        headers: Some(vec![("Content-Type".to_string(), "text/plain".to_string())]),
         body: Some(resp_body.trim().to_string()),
     }
 }
@@ -209,10 +210,17 @@ fn main() {
                     Ok(buffer_len) => {
                         let req = Request::from_utf8(&buffer[..buffer_len]).unwrap();
                         if let Err(err) = match req.path {
-                            path if path == "/" => stream.write_all(&Response::new(StatusCode::OK, None, None).as_bytes()),
-                            ref path if path.starts_with("/echo/") => stream.write_all(&echo_msg(&req).as_bytes()),
-                            ref path if path.starts_with("/user_agent") => stream.write_all(&echo_header(&req, "User-Agent").as_bytes()),
-                            _ => stream.write_all(&Response::new(StatusCode::NOT_FOUND, None, None).as_bytes()),
+                            path if path == "/" => stream
+                                .write_all(&Response::new(StatusCode::OK, None, None).as_bytes()),
+                            ref path if path.starts_with("/echo/") => {
+                                stream.write_all(&echo_msg(&req).as_bytes())
+                            }
+                            ref path if path.starts_with("/user-agent") => {
+                                stream.write_all(&echo_header(&req, "User-Agent").as_bytes())
+                            }
+                            _ => stream.write_all(
+                                &Response::new(StatusCode::NOT_FOUND, None, None).as_bytes(),
+                            ),
                         } {
                             println!("ERROR: {}", err);
                         }
