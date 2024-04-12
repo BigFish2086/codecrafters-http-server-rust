@@ -91,36 +91,22 @@ fn post_file(req: &Request, directory: &str) -> Response {
 
 fn handle_stream(mut stream: TcpStream, directory: Option<&str>) {
     println!("INFO: Incoming Connection {:?}", stream);
-    let mut buffer = [0u8; 1024];
-    match stream.read(&mut buffer) {
-        Ok(buffer_len) => {
-            let req = match Request::from_utf8(&buffer[..buffer_len]) {
-                Ok(req) => req,
-                Err(err) => {
-                    eprintln!("ERROR: {}", err);
-                    return;
-                }
-            };
-            let resp = match (&req.method, &req.path) {
-                (Method::GET, path) if *path == "/" => Response::new(StatusCode::OK, None, None),
-                (Method::GET, path) if path.starts_with("/echo/") => echo_msg(&req),
-                (Method::GET, path) if path.starts_with("/user-agent") => echo_header(&req, "User-Agent"),
-                (Method::GET, path) if path.starts_with("/files/") && directory.is_some() => {
-                    get_file(&req, directory.unwrap())
-                }
-                (Method::POST, path) if path.starts_with("/files/") && directory.is_some() => { 
-                    post_file(&req, directory.unwrap())
-                }
-                _ => Response::new(StatusCode::NOT_FOUND, None, None),
-            };
-            if let Err(err) = stream.write_all(&resp.as_bytes()) {
-                eprintln!("ERROR: {}", err);
-            }
+    let req = Request::from_stream(&mut stream).unwrap();
+    let resp = match (&req.method, &req.path) {
+        (Method::GET, path) if *path == "/" => Response::new(StatusCode::OK, None, None),
+        (Method::GET, path) if path.starts_with("/echo/") => echo_msg(&req),
+        (Method::GET, path) if path.starts_with("/user-agent") => echo_header(&req, "User-Agent"),
+        (Method::GET, path) if path.starts_with("/files/") && directory.is_some() => {
+            get_file(&req, directory.unwrap())
         }
-        Err(err) => {
-            eprintln!("ERROR: {}", err);
+        (Method::POST, path) if path.starts_with("/files/") && directory.is_some() => { 
+            post_file(&req, directory.unwrap())
         }
+        _ => Response::new(StatusCode::NOT_FOUND, None, None),
     };
+    if let Err(err) = stream.write_all(&resp.as_bytes()) {
+        eprintln!("ERROR: {}", err);
+    }
 }
 
 fn main() {

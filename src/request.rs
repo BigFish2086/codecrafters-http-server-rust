@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::error::Error;
+use std::io::{BufReader, BufRead, Read};
+use std::net::TcpStream;
 
 #[derive(Debug)]
 pub enum Method {
@@ -40,33 +42,52 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn from_utf8(buffer: &[u8]) -> Result<Self, Box<dyn Error>> {
-        let content = std::str::from_utf8(&buffer).unwrap();
-        if let Some((req, body)) = content.split_once("\r\n\r\n") {
-            let req: Vec<_> = req.split("\r\n").collect();
-
-            let status_line: Vec<_> = req[0].split(" ").collect();
-            if status_line.len() != 3 {
-                return Err("ERROR: Invalid status line".into());
+    pub fn from_stream(mut stream: &mut TcpStream) -> Result <Self, Box<dyn Error>> {
+        let mut reader = BufReader::new(&mut stream);
+        let mut start_line = String::new();
+        if let Err(_) = reader.read_line(&mut start_line) {
+            return Err("ERROR: Invalid start line".into());
+        }
+        let start_line: Vec<String> = start_line
+            .split(" ")
+            .into_iter()
+            .map(|str| str.to_string())
+            .collect();
+        if start_line.len() != 3 {
+            return Err("ERROR: Invalid start line".into());
+        }
+        let mut body = None;
+        let mut content_length = 0;
+        let mut headers: HashMap<String, String> = HashMap::new();
+        loop {
+            let mut line = String::new();
+            if let Err(_) = reader.read_line(&mut line) {
+                return Err("ERROR: Invalid request header".into());
             }
-            let [method, path, version] = status_line[..3].try_into().unwrap();
-
-            let mut headers: HashMap<String, String> = HashMap::new();
-            for line in &req[1..] {
-                if let Some((header, value)) = line.split_once(":") {
-                    headers.insert(header.to_string(), value.to_string());
+            if line == "\r\n" {
+                break;
+            }
+            if let Some((header, value)) = line.split_once(":") {
+                headers.insert(header.trim().to_lowercase().to_string(), value.trim().to_string());
+                if header.trim().to_lowercase() == "content-length" {
+                    match value.trim().parse::<usize>() {
+                        Ok(value) => content_length = value,
+                        Err(_) => return Err("ERROR: Invalid Content-Length header".into()),
+                    };
                 }
             }
-
-            Ok(Self {
-                method: method.into(),
-                path: path.to_string(),
-                version: version.to_string(),
-                headers: (!headers.is_empty()).then_some(headers),
-                body: (!body.is_empty()).then_some(body.to_string()),
-            })
-        } else {
-            Err("ERROR: Invalid Request".into())
         }
+        if content_length > 0 {
+            let mut body_content = vec![0; content_length];
+            reader.read_exact(&mut body_content).unwrap();
+            body = Some(String::from_utf8_lossy(&body_content).to_string());
+        }
+        Ok(Self {
+            method: start_line[0].clone().into(),
+            path: start_line[1].clone(),
+            version: start_line[2].clone(),
+            headers: (!headers.is_empty()).then_some(headers),
+            body: body,
+        })
     }
 }
