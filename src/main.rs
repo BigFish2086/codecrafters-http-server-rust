@@ -26,7 +26,7 @@ fn echo_msg(req: &Request) -> Response {
 fn echo_header(req: &Request, header: &str) -> Response {
     let binding = String::new();
     let resp_body = match &req.headers {
-        Some(map) => map.get(header).unwrap_or(&binding),
+        Some(map) => map.get(header.trim()).unwrap_or(&binding),
         None => "",
     };
     Response {
@@ -95,7 +95,7 @@ fn handle_stream(mut stream: TcpStream, directory: Option<&str>) {
     let resp = match (&req.method, &req.path) {
         (Method::GET, path) if *path == "/" => Response::new(StatusCode::OK, None, None),
         (Method::GET, path) if path.starts_with("/echo/") => echo_msg(&req),
-        (Method::GET, path) if path.starts_with("/user-agent") => echo_header(&req, "User-Agent"),
+        (Method::GET, path) if path.starts_with("/user-agent") => echo_header(&req, "user-agent"),
         (Method::GET, path) if path.starts_with("/files/") && directory.is_some() => {
             get_file(&req, directory.unwrap())
         }
