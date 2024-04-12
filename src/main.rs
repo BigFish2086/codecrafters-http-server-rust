@@ -4,12 +4,12 @@ mod status;
 
 use std::env;
 use std::fs;
-use std::io::{BufReader, Read, Write};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 use std::thread;
 
-use crate::request::Request;
+use crate::request::{Request, Method};
 use crate::response::Response;
 use crate::status::StatusCode;
 
@@ -68,6 +68,27 @@ fn get_file(req: &Request, directory: &str) -> Response {
     }
 }
 
+fn post_file(req: &Request, directory: &str) -> Response {
+    let files_len = "/files/".len();
+    let filepath = fs::canonicalize(directory)
+        .unwrap()
+        .join(&req.path[files_len..]);
+
+    let mut have_written = false;
+    if let Ok(file_input) = fs::File::create(filepath) {
+        let mut file_buffered = BufWriter::new(file_input);
+        if req.body.is_some() && file_buffered.write_all(req.body.as_ref().unwrap().as_bytes()).is_ok() {
+            have_written = true;
+        }
+    }
+
+    if have_written {
+        Response::new(StatusCode::CREATED, None, None)
+    } else {
+        Response::new(StatusCode::INTERNAL_SERVER_ERROR, None, None)
+    }
+}
+
 fn handle_stream(mut stream: TcpStream, directory: Option<&str>) {
     println!("INFO: Incoming Connection {:?}", stream);
     let mut buffer = [0u8; 1024];
@@ -80,12 +101,15 @@ fn handle_stream(mut stream: TcpStream, directory: Option<&str>) {
                     return;
                 }
             };
-            let resp = match req.path {
-                ref path if path == "/" => Response::new(StatusCode::OK, None, None),
-                ref path if path.starts_with("/echo/") => echo_msg(&req),
-                ref path if path.starts_with("/user-agent") => echo_header(&req, "User-Agent"),
-                ref path if path.starts_with("/files/") && directory.is_some() => {
+            let resp = match (&req.method, &req.path) {
+                (Method::GET, path) if *path == "/" => Response::new(StatusCode::OK, None, None),
+                (Method::GET, path) if path.starts_with("/echo/") => echo_msg(&req),
+                (Method::GET, path) if path.starts_with("/user-agent") => echo_header(&req, "User-Agent"),
+                (Method::GET, path) if path.starts_with("/files/") && directory.is_some() => {
                     get_file(&req, directory.unwrap())
+                }
+                (Method::POST, path) if path.starts_with("/files/") && directory.is_some() => { 
+                    post_file(&req, directory.unwrap())
                 }
                 _ => Response::new(StatusCode::NOT_FOUND, None, None),
             };

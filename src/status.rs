@@ -83,5 +83,7 @@ macro_rules! status_codes {
 
 status_codes! {
     (200, OK, "OK");
+    (201, CREATED, "Created");
     (404, NOT_FOUND, "Not Found");
+    (500, INTERNAL_SERVER_ERROR, "Internal Server Error");
 }
